@@ -22,22 +22,7 @@ class DefaultController extends Controller
         return [
             'access' => [
                 'class' => AccessControl::className(),
-                'rules' => [
-                    [
-                        'allow' => true,
-                        'actions' => [
-                            'index',
-                            'upload',
-                            'download',
-                            'delete',
-                            'get-bucket-object',
-                            'get-object',
-                            'create-folder',
-                            'delete-folder',
-                        ],
-                        'roles' => ['@'],
-                    ],
-                ],
+                'rules' => \Yii::$app->getModule('s3manager')->getAccessRules(),
             ],
             'verbs' => [
                 'class' => VerbFilter::className(),

@@ -38,7 +38,14 @@ class Module extends \yii\base\Module
      */
     public const SESSION_PREFIX_KEY = 'skys3prefix';
 
-
+    /**
+     * Access control rules for the module's actions
+     * Apps can override these by setting this property in their module config
+     * If null (default), intelligent defaults will be used
+     *
+     * @var array|null
+     */
+    public $accessRules = null;
 
     /**
      * @inheritdoc
@@ -53,5 +60,36 @@ class Module extends \yii\base\Module
 
         // custom initialization code goes here
         $this->modules = [];
+    }
+
+    /**
+     * Gets the access control rules for the module's actions
+     * Returns default rules if none were explicitly configured
+     *
+     * @return array The access control rules
+     */
+    public function getAccessRules(): array
+    {
+        if ($this->accessRules !== null) {
+            return $this->accessRules;
+        }
+
+        // Intelligent defaults: all actions available to authenticated users
+        return [
+            [
+                'allow' => true,
+                'actions' => [
+                    'index',
+                    'upload',
+                    'download',
+                    'delete',
+                    'get-bucket-object',
+                    'get-object',
+                    'create-folder',
+                    'delete-folder',
+                ],
+                'roles' => ['@'],
+            ],
+        ];
     }
 }
