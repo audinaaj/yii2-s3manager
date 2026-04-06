@@ -252,8 +252,8 @@ class DefaultController extends Controller
         /**
          * Finally, check module configuration
          */
-        if (array_key_exists('region', \Yii::$app->modules['s3manager']['configuration'])) {
-            return \Yii::$app->modules['s3manager']['configuration']['region'];
+        if (array_key_exists('region', \Yii::$app->modules['s3manager']->configuration)) {
+            return \Yii::$app->modules['s3manager']->configuration['region'];
         }
 
         throw new \yii\web\BadRequestHttpException('There is no region configuration. Please refer to the Readme');
