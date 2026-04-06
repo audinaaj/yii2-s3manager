@@ -241,11 +241,11 @@ class S3Adapter extends \yii\base\BaseObject
         if ($this->s3Endpoint !== null) {
             // For custom endpoints like DigitalOcean Spaces
             $endpoint = rtrim($this->s3Endpoint, '/');
-            $key = preg_replace('/(/+)/', '/', "$this->s3Bucket/$this->s3Prefix/$key");
+            $key = preg_replace('/(\/+)/', '/', "$this->s3Bucket/$this->s3Prefix/$key");
             return "$endpoint/$key";
         } else {
             // Default AWS S3 format
-            $key = preg_replace('/(/+)/', '/', "$this->s3Bucket.s3.amazonaws.com/$this->s3Prefix/$key");
+            $key = preg_replace('/(\/+)/', '/', "$this->s3Bucket.s3.amazonaws.com/$this->s3Prefix/$key");
             return "https://$key";
         }
     }
