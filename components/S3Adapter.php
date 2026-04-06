@@ -80,7 +80,6 @@ class S3Adapter extends \yii\base\BaseObject
         $config = [
             'version' => $this->s3version,
             'region'  => $this->s3Region,
-            'scheme' => $this->s3scheme,
         ];
 
         // Add endpoint if specified (for non-AWS S3 providers like DigitalOcean Spaces)
