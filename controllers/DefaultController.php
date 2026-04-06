@@ -181,6 +181,16 @@ class DefaultController extends Controller
             's3Prefix' => $this->getPrefix(),
         ];
 
+        $credentials = $this->getCredentials();
+        if ($credentials !== null) {
+            $parameters['credentials'] = $credentials;
+        }
+
+        $endpoint = $this->getEndpoint();
+        if ($endpoint !== null) {
+            $parameters['s3Endpoint'] = $endpoint;
+        }
+
         if ($delimiter !== null) {
             $parameters['delimiter'] = $delimiter;
         }
@@ -290,6 +300,63 @@ class DefaultController extends Controller
         $manager = \Yii::$app->getModule('s3manager');
         if (array_key_exists('prefix', $manager->configuration)) {
             return $manager->configuration['prefix'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Gets AWS credentials (key and secret) from session, params, or module configuration
+     *
+     * @return array|null The credentials array with 'key' and 'secret', or null if not configured
+     */
+    private function getCredentials(): ?array
+    {
+        $session = \Yii::$app->session;
+
+        /**
+         * Check on the fly configuration first
+         */
+        if ($session->has(skyS3Module::SESSION_BUCKET_KEY . '_creds')) {
+            $creds = $session->get(skyS3Module::SESSION_BUCKET_KEY . '_creds');
+            if ($creds !== null && is_array($creds) && isset($creds['key']) && isset($creds['secret'])) {
+                return $creds;
+            }
+        }
+
+        /**
+         * Next check parameters
+         */
+        if (isset(\Yii::$app->params['s3credentials']) && is_array(\Yii::$app->params['s3credentials'])) {
+            if (isset(\Yii::$app->params['s3credentials']['key']) && isset(\Yii::$app->params['s3credentials']['secret'])) {
+                return \Yii::$app->params['s3credentials'];
+            }
+        }
+
+        /**
+         * Finally, check module configuration
+         */
+        $manager = \Yii::$app->getModule('s3manager');
+        if (array_key_exists('credentials', $manager->configuration)) {
+            $creds = $manager->configuration['credentials'];
+            if (is_array($creds) && isset($creds['key']) && isset($creds['secret'])) {
+                return $creds;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Gets the S3 endpoint from module configuration (for non-AWS S3 providers like DigitalOcean Spaces)
+     *
+     * @return     string|null                       The endpoint URL, or null if not configured
+     */
+    private function getEndpoint(): ?string
+    {
+        $manager = \Yii::$app->getModule('s3manager');
+        if (array_key_exists('endpoint', $manager->configuration)) {
+            return $manager->configuration['endpoint'];
         }
 
         return null;
