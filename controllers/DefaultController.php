@@ -179,7 +179,7 @@ class DefaultController extends Controller
             's3Bucket' => $this->getBucketName(),
             's3Region' => $this->getRegionName(),
             's3Prefix' => $this->getPrefix(),
-            ];
+        ];
 
         if ($delimiter !== null) {
             $parameters['delimiter'] = $delimiter;
@@ -288,8 +288,8 @@ class DefaultController extends Controller
          * Finally, check module configuration
          */
         $manager = \Yii::$app->getModule('s3manager');
-        if (array_key_exists('s3prefix', $manager->configuration)) {
-            return $manager->configuration['s3prefix'];
+        if (array_key_exists('prefix', $manager->configuration)) {
+            return $manager->configuration['prefix'];
         }
 
         return null;

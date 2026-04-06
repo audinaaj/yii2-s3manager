@@ -24,7 +24,9 @@ class S3Adapter extends \yii\base\BaseObject
     private $s3;
     public string $s3Bucket;
     public string $s3Region;
-    public ?string $s3Prefix = null;
+    public string $s3Prefix = '';
+    public ?string $s3Endpoint = null;
+    public ?array $credentials = null;
 
     /**
      * @var League\Flysystem\Filesystem $filesystem
@@ -75,11 +77,26 @@ class S3Adapter extends \yii\base\BaseObject
         // Set root folder icon
         $this->folderObject[0]['icon'] = $this->folderIcon;
 
-        $this->s3 = new S3Client([
+        $config = [
             'version' => $this->s3version,
             'region'  => $this->s3Region,
             'scheme' => $this->s3scheme,
-        ]);
+        ];
+
+        // Add endpoint if specified (for non-AWS S3 providers like DigitalOcean Spaces)
+        if ($this->s3Endpoint !== null) {
+            $config['endpoint'] = $this->s3Endpoint;
+        }
+
+        // Add credentials if specified
+        if ($this->credentials !== null && isset($this->credentials['key']) && isset($this->credentials['secret'])) {
+            $config['credentials'] = [
+                'key'    => $this->credentials['key'],
+                'secret' => $this->credentials['secret'],
+            ];
+        }
+
+        $this->s3 = new S3Client($config);
 
         parent::init();
     }
@@ -221,8 +238,17 @@ class S3Adapter extends \yii\base\BaseObject
      */
     public function getEffectiveUrl(string $key): string
     {
-        $key = preg_replace('/(\/+)/', '/', "$this->s3Bucket.s3.amazonaws.com/$this->s3Prefix/$key");
-        return "https://$key";
+        // Use custom endpoint if provided, otherwise default to AWS S3
+        if ($this->s3Endpoint !== null) {
+            // For custom endpoints like DigitalOcean Spaces
+            $endpoint = rtrim($this->s3Endpoint, '/');
+            $key = preg_replace('/(/+)/', '/', "$this->s3Bucket/$this->s3Prefix/$key");
+            return "$endpoint/$key";
+        } else {
+            // Default AWS S3 format
+            $key = preg_replace('/(/+)/', '/', "$this->s3Bucket.s3.amazonaws.com/$this->s3Prefix/$key");
+            return "https://$key";
+        }
     }
 
     /**
@@ -317,7 +343,7 @@ class S3Adapter extends \yii\base\BaseObject
             new \League\Flysystem\AwsS3V3\AwsS3V3Adapter(
                 $this->s3,
                 $this->s3Bucket,
-                $this->s3Prefix
+                $this->s3Prefix ?? ''
             )
         );
     }
