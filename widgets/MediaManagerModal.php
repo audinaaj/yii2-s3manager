@@ -47,34 +47,34 @@ class MediaManagerModal extends Widget
         if ($this->s3bucket === null) {
             $this->s3bucket = isset(\Yii::$app->params['s3bucket'])
                 ? \Yii::$app->params['s3bucket']
-                : \Yii::$app->modules['s3manager']->configuration['bucket'];
+                : \Yii::$app->modules['s3manager']['configuration']['bucket'];
         }
 
         if ($this->s3region === null) {
             $this->s3region = isset(\Yii::$app->params['s3region'])
                 ? \Yii::$app->params['s3region']
-                : \Yii::$app->modules['s3manager']->configuration['region'];
+                : \Yii::$app->modules['s3manager']['configuration']['region'];
         }
 
         if ($this->s3prefix === null) {
             if (isset(\Yii::$app->params['s3prefix'])) {
                 $this->s3prefix = \Yii::$app->params['s3prefix'];
-            } elseif (isset(\Yii::$app->modules['s3manager']->configuration['prefix'])) {
-                $this->s3prefix = \Yii::$app->modules['s3manager']->configuration['prefix'];
+            } elseif (isset(\Yii::$app->modules['s3manager']['configuration']['prefix'])) {
+                $this->s3prefix = \Yii::$app->modules['s3manager']['configuration']['prefix'];
             }
         }
 
         if ($this->s3credentials === null) {
             if (isset(\Yii::$app->params['s3credentials'])) {
                 $this->s3credentials = \Yii::$app->params['s3credentials'];
-            } elseif (isset(\Yii::$app->modules['s3manager']->configuration['credentials'])) {
-                $this->s3credentials = \Yii::$app->modules['s3manager']->configuration['credentials'];
+            } elseif (isset(\Yii::$app->modules['s3manager']['configuration']['credentials'])) {
+                $this->s3credentials = \Yii::$app->modules['s3manager']['configuration']['credentials'];
             }
         }
 
         if ($this->s3endpoint === null) {
-            if (isset(\Yii::$app->modules['s3manager']->configuration['endpoint'])) {
-                $this->s3endpoint = \Yii::$app->modules['s3manager']->configuration['endpoint'];
+            if (isset(\Yii::$app->modules['s3manager']['configuration']['endpoint'])) {
+                $this->s3endpoint = \Yii::$app->modules['s3manager']['configuration']['endpoint'];
             }
         }
     }

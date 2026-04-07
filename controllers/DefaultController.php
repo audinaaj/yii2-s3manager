@@ -333,12 +333,34 @@ class DefaultController extends Controller
     }
 
     /**
-     * Gets the S3 endpoint from module configuration (for non-AWS S3 providers like DigitalOcean Spaces)
+     * Gets the S3 endpoint from session, params, or module configuration (for non-AWS S3 providers like DigitalOcean Spaces)
      *
      * @return     string|null                       The endpoint URL, or null if not configured
      */
     private function getEndpoint(): ?string
     {
+        $session = \Yii::$app->session;
+
+        /**
+         * Check on the fly configuration first
+         */
+        if ($session->has(skyS3Module::SESSION_BUCKET_KEY . '_endpoint')) {
+            $endpoint = $session->get(skyS3Module::SESSION_BUCKET_KEY . '_endpoint');
+            if ($endpoint !== null) {
+                return $endpoint;
+            }
+        }
+
+        /**
+         * Next check parameters
+         */
+        if (isset(\Yii::$app->params['s3endpoint'])) {
+            return \Yii::$app->params['s3endpoint'];
+        }
+
+        /**
+         * Finally, check module configuration
+         */
         $manager = \Yii::$app->getModule('s3manager');
         if (array_key_exists('endpoint', $manager->configuration)) {
             return $manager->configuration['endpoint'];
