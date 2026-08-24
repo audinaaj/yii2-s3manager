@@ -82,6 +82,7 @@ class Module extends \yii\base\Module
                     'index',
                     'upload',
                     'download',
+                    'thumbnail',
                     'delete',
                     'get-bucket-object',
                     'get-object',

@@ -154,6 +154,24 @@ class DefaultController extends Controller
     }
 
     /**
+     * Generates or retrieves a cached thumbnail for an image
+     * @var string $key the s3 object key
+     * @return void Redirects to the thumbnail file
+     */
+    public function actionThumbnail(string $key)
+    {
+        $s3 = $this->instantiateS3Adapter();
+        $thumbUrl = $s3->getOrCreateThumbnail($key);
+        
+        if ($thumbUrl === '') {
+            \Yii::$app->response->statusCode = 404;
+            return;
+        }
+        
+        \Yii::$app->response->redirect($thumbUrl);
+    }
+
+    /**
      * Instantiates the s3 adapter object
      * @param string|null $delimiter the delimiter parameter (used for listObjects etc)
      * @return the S3Adapter object

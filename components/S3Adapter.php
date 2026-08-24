@@ -531,4 +531,91 @@ class S3Adapter extends \yii\base\BaseObject
             'type' => 'unknown'
         ];
     }
+
+    /**
+     * Check if file is an image based on extension
+     *
+     * @param string $filename
+     * @return boolean
+     */
+    public function isImage(string $filename): bool
+    {
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        return in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']);
+    }
+
+    /**
+     * Generate or retrieve cached thumbnail for an image
+     * Uses ETag for cache invalidation - new file = new ETag = new thumbnail
+     * Maintains aspect ratio within a square bounding box
+     *
+     * @param string $key The S3 object key
+     * @param integer $maxSize Maximum width or height in pixels (creates square box)
+     * @return string The path to the thumbnail file
+     */
+    public function getOrCreateThumbnail(string $key, int $maxSize = 300): string
+    {
+        try {
+            $metadata = $this->s3->headObject([
+                'Bucket' => $this->s3Bucket,
+                'Key'    => $this->s3Prefix . $key,
+            ]);
+            
+            $etag = trim($metadata['ETag'], '"');
+            $basename = pathinfo($key, PATHINFO_FILENAME);
+            $thumbPath = \Yii::getAlias('@webroot/thumbs');
+            @mkdir($thumbPath, 0755, true);
+            
+            $thumbFile = "$thumbPath/thumb_{$basename}_{$etag}.jpg";
+            
+            if (file_exists($thumbFile)) {
+                return "/thumbs/" . basename($thumbFile);
+            }
+            
+            // Clean up old versions of this thumbnail (lazy cleanup)
+            foreach (glob("$thumbPath/thumb_{$basename}_*.jpg") as $oldFile) {
+                @unlink($oldFile);
+            }
+            
+            // Generate thumbnail from S3 image
+            $imageData = $this->download($key);
+            if (!isset($imageData['Body'])) {
+                return '';
+            }
+            
+            $original = @imagecreatefromstring($imageData['Body']);
+            if ($original === false) {
+                \Yii::error('Failed to create image from S3 object: ' . $key);
+                return '';
+            }
+            
+            // Get original dimensions and calculate scaled size preserving aspect ratio
+            $origWidth = imagesx($original);
+            $origHeight = imagesy($original);
+            $ratio = $origWidth / $origHeight;
+            
+            if ($ratio > 1) {
+                // Wider than tall
+                $newWidth = $maxSize;
+                $newHeight = (int)($maxSize / $ratio);
+            } else {
+                // Taller than wide
+                $newHeight = $maxSize;
+                $newWidth = (int)($maxSize * $ratio);
+            }
+            
+            // Create thumbnail scaled to fit within box
+            $thumb = imagecreatetruecolor($newWidth, $newHeight);
+            imagecopyresampled($thumb, $original, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
+            imagejpeg($thumb, $thumbFile, 85);
+            
+            imagedestroy($original);
+            imagedestroy($thumb);
+            
+            return "/thumbs/" . basename($thumbFile);
+        } catch (\Exception $e) {
+            \Yii::error('Thumbnail generation error for ' . $key . ': ' . $e->getMessage());
+            return '';
+        }
+    }
 }

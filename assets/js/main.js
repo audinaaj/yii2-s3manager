@@ -7,7 +7,7 @@ var bucketObject;
  */
 $(document).ready( function() {
     /**
-     * TOOLSIPS
+     * TOOLTIPS
      */
     $('[data-toggle="tooltip"]').tooltip();
 
@@ -27,6 +27,8 @@ $(document).ready( function() {
                 bucketObject['/'][file].id, 
                 bucketObject['/'][file].modified, 
                 convertSize(bucketObject['/'][file].size),
+                (bucketObject['/'][file].filetype === 'image'),
+                bucketObject['/'][file].id
                 ));
         }
 
@@ -246,6 +248,8 @@ $('#folderTree').on("changed.jstree", function (e, data) {
             object.id, 
             object.modified, 
             convertSize(object.size),
+            (object.filetype === 'image'),
+            object.id
         );
 
        $('#files').append(fileRow);
@@ -313,8 +317,14 @@ function convertSize(filesize)
   return size[0]+' '+dim;
 }
 
-function buildFileRow(icon, filename, id, modified, size)
+function buildFileRow(icon, filename, id, modified, size, isImage = false, imageKey = null)
 {
+    let thumbHtml = '';
+    // Safely check if it's an image (defensive for cases where filetype isn't set)
+    if (isImage && imageKey) {
+        thumbHtml = `<img src="/s3manager/default/thumbnail?key=${encodeURIComponent(imageKey)}" alt="${filename}" style="max-height:100px; max-width:150px; object-fit:contain;" class="img-thumbnail" />&nbsp;`;
+    }
+    
     var filerow = `<tr class="fileRow">
         <td>
             <a href="#" id="${id}" class="s3mm-object" data-toggle="tooltip" data-placement="top" title="Download">
@@ -323,7 +333,7 @@ function buildFileRow(icon, filename, id, modified, size)
                 <i class="far fa-times-circle text-danger"></i>
             </a>
         </td> 
-        <td><i class="${icon}"></i> ${filename}</a></td>
+        <td><i class="${icon}"></i> ${filename}<div>${thumbHtml}</div></td>
         <td>${modified}</td>
         <td class="text-right text-muted">${size}</td>
     </tr>`;
