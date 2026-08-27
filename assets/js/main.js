@@ -19,19 +19,6 @@ $(document).ready( function() {
 
         createJsTree(obj.folderObject);
 
-        for ( var file in bucketObject['/'] )
-        {
-            $('#files').append(buildFileRow(
-                bucketObject['/'][file].icon, 
-                bucketObject['/'][file].text, 
-                bucketObject['/'][file].id, 
-                bucketObject['/'][file].modified, 
-                convertSize(bucketObject['/'][file].size),
-                (bucketObject['/'][file].filetype === 'image'),
-                bucketObject['/'][file].id
-                ));
-        }
-
         $('#mm__wrapper').unblock();
     });  
 
@@ -40,19 +27,101 @@ $(document).ready( function() {
 
     $('.modal').on('show.bs.modal', function(e) {
         opener = document.activeElement;
+        
+        // Get the target input from the button's data attribute
+        var targetInputId = $(opener).data('target-input');
+        var inputField = targetInputId ? $('#' + targetInputId) : null;
+        var folderToLoad = '/';
+        
+        // First, check if we have the folder stored as data attribute
+        if (inputField && inputField.data('s3-folder')) {
+            folderToLoad = inputField.data('s3-folder');
+        } 
+        // Otherwise, try to extract folder from the URL in the input field
+        else if (inputField && inputField.val()) {
+            folderToLoad = extractFolderFromUrl(inputField.val());
+        }
+        
+        // Load files and auto-select in tree
+        loadFilesInFolder(folderToLoad);
+        
+        if (folderToLoad !== '/' && folderToLoad !== '') {
+            setTimeout(function() {
+                $('#folderTree').jstree(true).select_node(folderToLoad);
+            }, 100);
+        }
     });
 
     /**
-     * Populate the input field with the selected file's effective URL
+     * Populate the input field with the selected file's effective URL and store the folder context
      */
     $('#insertFile').click(function(){
-        // @todo don't do this
-        var target = $(opener).parent().parent().find('input').attr('id');
-        $('#'+target).val($('#selectedFile').val());
-        $('#'+target).trigger('change');
+        var targetInputId = $(opener).data('target-input');
+        var currentFolder = $('#s3mm-upload-path').val();
+        
+        $('#' + targetInputId).val($('#selectedFile').val());
+        $('#' + targetInputId).data('s3-folder', currentFolder);  // Store folder on input for next time
+        $('#' + targetInputId).trigger('change');
         $('#MediaManager').modal('hide');
     });
 });
+
+/**
+ * Extract folder path from a full S3 URL
+ * Examples:
+ * - https://auditiva.nyc3.cdn.digitaloceanspaces.com/carousel/slide-1.jpg → /carousel/
+ * - //cdn.auditiva.us/carousel/slide-1.jpg → /carousel/
+ * - https://nyc3.digitaloceanspaces.com/auditiva/carousel/slide-1.jpg → /auditiva/carousel/
+ */
+function extractFolderFromUrl(urlString) {
+    // Remove protocol (http://, https://, or //)
+    var path = urlString.replace(/^(https?:)?\/\//, '');
+    
+    // Remove domain (everything up to first /)
+    var firstSlash = path.indexOf('/');
+    if (firstSlash === -1) {
+        return '/';
+    }
+    path = path.substring(firstSlash + 1);
+    
+    // Remove filename (last segment after last /)
+    var lastSlash = path.lastIndexOf('/');
+    if (lastSlash > 0) {
+        path = path.substring(0, lastSlash);
+    } else {
+        return '/';
+    }
+    
+    return '/' + path + '/';
+}
+
+/**
+ * Load files for a given folder path
+ */
+function loadFilesInFolder(folderPath) {
+    $('#s3mm-upload-path').val(folderPath);
+    $('#s3mm-object-path-display').html(folderPath);
+    $('#s3mm-file-url-display').html(null);
+    $('#s3mm-copy-file-uri').addClass('invisible');
+    $('#files').html('');
+
+    if (bucketObject[folderPath]) {
+        for (var file in bucketObject[folderPath]) {
+            var filename = bucketObject[folderPath][file].text;
+            var object = bucketObject[folderPath][file];
+            var fileRow = buildFileRow(
+                object.icon, 
+                filename, 
+                object.id, 
+                object.modified, 
+                convertSize(object.size),
+                (object.filetype === 'image'),
+                object.id
+            );
+            $('#files').append(fileRow);
+        }
+    }
+}
 
 function createJsTree(data)
 {

@@ -92,6 +92,7 @@ class FileInput extends InputWidget
             ]);
 
         $this->buttonOptions['data-toggle'] = 'modal';
+        $this->buttonOptions['data-target-input'] = $this->options['id'];
         $this->buttonOptions['href'] = '#MediaManager';
         $this->resetButtonOptions['role'] = 'clear-input';
         $this->resetButtonOptions['data-clear-element-id'] = $this->options['id'];
