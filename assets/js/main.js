@@ -16,6 +16,9 @@ $(document).ready( function() {
     $.get('/s3manager/default/get-bucket-object', function(data) {
         var obj = JSON.parse(data);
         bucketObject = JSON.parse(obj.bucketObject);
+        
+        // Store S3 config from backend for URL extraction
+        window.s3Bucket = obj.s3Bucket || '';
 
         createJsTree(obj.folderObject);
 
@@ -39,7 +42,7 @@ $(document).ready( function() {
         } 
         // Otherwise, try to extract folder from the URL in the input field
         else if (inputField && inputField.val()) {
-            folderToLoad = extractFolderFromUrl(inputField.val());
+            folderToLoad = extractFolderFromUrl(inputField.val(), window.s3Bucket);
         }
         
         // Load files and auto-select in tree
@@ -71,14 +74,16 @@ $(document).ready( function() {
 
 /**
  * Extract folder path from a full S3 URL or relative path
- * Examples:
- * - https://auditiva.nyc3.cdn.digitaloceanspaces.com/carousel/slide-1.jpg → /carousel/
- * - //cdn.auditiva.us/carousel/slide-1.jpg → /carousel/
- * - https://nyc3.digitaloceanspaces.com/auditiva/carousel/slide-1.jpg → /auditiva/carousel/
- * - products/arco-ric-3-colors.png → /products/
- * - /products/arco-ric-3-colors.png → /products/
+ * Works reliably with:
+ * - CDN URLs: https://cdn.auditiva.us/carousel/slide-1.jpg → /carousel/
+ * - Endpoint URLs: https://nyc3.digitaloceanspaces.com/auditiva/carousel/file.jpg → /carousel/
+ * - Relative paths: products/file.jpg → /products/
+ * - Absolute paths: /products/file.jpg → /products/
+ * 
+ * @param {string} urlString - The URL or path to extract folder from
+ * @param {string} bucket - Optional bucket name to strip (e.g., 'auditiva')
  */
-function extractFolderFromUrl(urlString) {
+function extractFolderFromUrl(urlString, bucket) {
     if (!urlString || urlString.trim() === '') {
         return '/';
     }
@@ -96,6 +101,14 @@ function extractFolderFromUrl(urlString) {
             return '/';
         }
         path = path.substring(firstSlash + 1);
+        
+        // Strip bucket name if it's at the start of the path (endpoint-style URLs)
+        if (bucket) {
+            var bucketRegex = new RegExp('^' + bucket + '(/|$)');
+            if (bucketRegex.test(path)) {
+                path = path.substring(bucket.length);
+            }
+        }
     }
     
     // Remove filename (last segment after last /)

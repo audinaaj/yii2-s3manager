@@ -54,7 +54,11 @@ class DefaultController extends Controller
             return json_encode($s3->folderObject);
         }
 
-        return json_encode(['bucketObject' => $s3->bucketObject, 'folderObject' => $s3->folderObject]);
+        return json_encode([
+            'bucketObject' => $s3->bucketObject,
+            'folderObject' => $s3->folderObject,
+            's3Bucket' => $s3->s3Bucket,
+        ]);
     }
 
     public function actionGetObject(string $key, bool $justPath = true): string
