@@ -69,6 +69,16 @@ class S3FileInput extends YiiInputWidget
     {
         parent::init();
 
+        // Generate input ID if not explicitly set
+        if (empty($this->options['id'])) {
+            if ($this->hasModel()) {
+                $this->options['id'] = Html::getInputId($this->model, $this->attribute);
+            } else {
+                // For non-model inputs, generate a reasonable ID from the name
+                $this->options['id'] = str_replace(['[', ']'], ['-', ''], $this->name);
+            }
+        }
+
         $input = $this->buildInput();
 
         echo $input;
@@ -176,7 +186,7 @@ class S3FileInput extends YiiInputWidget
     protected function buildInputGroup(): string
     {
         $group = '<div class="input-group-' . $this->inputGroup . '">';
-        $group .= '<button href="#MediaManager" class="btn btn-secondary" type="button" data-toggle="modal">';
+        $group .= '<button href="#MediaManager" class="btn btn-secondary" type="button" data-toggle="modal" data-target-input="' . $this->options['id'] . '">';
         $group .= $this->inputGroupContent;
         $group .= '</button>';
         $group .= '</div>';

@@ -46,8 +46,11 @@ $(document).ready( function() {
         loadFilesInFolder(folderToLoad);
         
         if (folderToLoad !== '/' && folderToLoad !== '') {
+            // Normalize the path for jstree node selection
+            var normalizedPath = folderToLoad.replace(/^\/+|\/+$/g, '') || '/';
             setTimeout(function() {
-                $('#folderTree').jstree(true).select_node(folderToLoad);
+                $('#folderTree').jstree(true).deselect_all();
+                $('#folderTree').jstree(true).select_node(normalizedPath);
             }, 100);
         }
     });
@@ -67,28 +70,43 @@ $(document).ready( function() {
 });
 
 /**
- * Extract folder path from a full S3 URL
+ * Extract folder path from a full S3 URL or relative path
  * Examples:
  * - https://auditiva.nyc3.cdn.digitaloceanspaces.com/carousel/slide-1.jpg → /carousel/
  * - //cdn.auditiva.us/carousel/slide-1.jpg → /carousel/
  * - https://nyc3.digitaloceanspaces.com/auditiva/carousel/slide-1.jpg → /auditiva/carousel/
+ * - products/arco-ric-3-colors.png → /products/
+ * - /products/arco-ric-3-colors.png → /products/
  */
 function extractFolderFromUrl(urlString) {
-    // Remove protocol (http://, https://, or //)
-    var path = urlString.replace(/^(https?:)?\/\//, '');
-    
-    // Remove domain (everything up to first /)
-    var firstSlash = path.indexOf('/');
-    if (firstSlash === -1) {
+    if (!urlString || urlString.trim() === '') {
         return '/';
     }
-    path = path.substring(firstSlash + 1);
+    
+    var path = urlString.trim();
+    
+    // Check if it's a full URL (has protocol or //)
+    if (/^(https?:)?\/\//.test(path)) {
+        // Remove protocol (http://, https://, or //)
+        path = path.replace(/^(https?:)?\/\//, '');
+        
+        // Remove domain (everything up to first /)
+        var firstSlash = path.indexOf('/');
+        if (firstSlash === -1) {
+            return '/';
+        }
+        path = path.substring(firstSlash + 1);
+    }
     
     // Remove filename (last segment after last /)
     var lastSlash = path.lastIndexOf('/');
     if (lastSlash > 0) {
         path = path.substring(0, lastSlash);
+    } else if (lastSlash === 0) {
+        // Path is like "/filename" - root folder
+        return '/';
     } else {
+        // No slash found - single file in root
         return '/';
     }
     
@@ -99,16 +117,19 @@ function extractFolderFromUrl(urlString) {
  * Load files for a given folder path
  */
 function loadFilesInFolder(folderPath) {
+    // Normalize the folder path for bucket lookup (remove leading/trailing slashes)
+    var normalizedPath = folderPath.replace(/^\/+|\/+$/g, '') || '/';
+    
     $('#s3mm-upload-path').val(folderPath);
     $('#s3mm-object-path-display').html(folderPath);
     $('#s3mm-file-url-display').html(null);
     $('#s3mm-copy-file-uri').addClass('invisible');
     $('#files').html('');
 
-    if (bucketObject[folderPath]) {
-        for (var file in bucketObject[folderPath]) {
-            var filename = bucketObject[folderPath][file].text;
-            var object = bucketObject[folderPath][file];
+    if (bucketObject[normalizedPath]) {
+        for (var file in bucketObject[normalizedPath]) {
+            var filename = bucketObject[normalizedPath][file].text;
+            var object = bucketObject[normalizedPath][file];
             var fileRow = buildFileRow(
                 object.icon, 
                 filename, 
@@ -299,29 +320,12 @@ $('#s3mm-copy-file-uri').click( function() {
  * When a folder in the jstree is selected, get those files and redraw
  */
 $('#folderTree').on("changed.jstree", function (e, data) {
-
-    $('#s3mm-upload-path').val(data.selected);
-    $('#s3mm-object-path-display').html(data.selected);
-    $('#s3mm-file-url-display').html(null);
-    $('#s3mm-copy-file-uri').addClass('invisible');
-
-    $('#files').html(' ');
-
-    for ( var file in bucketObject[data.selected] )
-    {
-        var filename = bucketObject[data.selected][file].text;
-        var object = bucketObject[data.selected][file];
-        var fileRow = buildFileRow(
-            object.icon, 
-            filename, 
-            object.id, 
-            object.modified, 
-            convertSize(object.size),
-            (object.filetype === 'image'),
-            object.id
-        );
-
-       $('#files').append(fileRow);
+    // data.selected is an array; get the first selected node
+    if (data.selected.length > 0) {
+        var selectedFolder = data.selected[0];
+        // Convert node id back to folder path format for consistency
+        var folderPath = selectedFolder === '/' ? '/' : '/' + selectedFolder + '/';
+        loadFilesInFolder(folderPath);
     }
 });
 

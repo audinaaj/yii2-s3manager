@@ -105,6 +105,11 @@ class FileInput extends InputWidget
     {
         parent::init();
 
+        // Generate input ID if not explicitly set
+        if (empty($this->options['id'])) {
+            $this->options['id'] = Html::getInputId($this->model, $this->attribute);
+        }
+
         if (empty($this->buttonOptions['id'])) {
             $this->buttonOptions['id'] = $this->options['id'] . '-btn';
         }
@@ -112,6 +117,7 @@ class FileInput extends InputWidget
         $this->buttonOptions['data-toggle'] = 'modal';
         $this->buttonOptions['href'] = '#MediaManager';
         $this->buttonOptions['type'] = 'button';
+        $this->buttonOptions['data-target-input'] = $this->options['id'];
         $this->resetButtonOptions['role'] = 'clear-input';
         $this->resetButtonOptions['data-clear-element-id'] = $this->options['id'];
     }
