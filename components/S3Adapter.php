@@ -26,6 +26,7 @@ class S3Adapter extends \yii\base\BaseObject
     public string $s3Region;
     public string $s3Prefix = '';
     public ?string $s3Endpoint = null;
+    public ?string $s3CdnUrl = null;
     public ?array $credentials = null;
 
     /**
@@ -237,8 +238,21 @@ class S3Adapter extends \yii\base\BaseObject
      */
     public function getEffectiveUrl(string $key): string
     {
+        // Use CDN URL if provided (takes priority over endpoint)
+        if ($this->s3CdnUrl !== null) {
+            $cdnUrl = rtrim($this->s3CdnUrl, '/');
+            $parts = [];
+            if ($this->s3Prefix) {
+                $parts[] = $this->s3Prefix;
+            }
+            if ($key) {
+                $parts[] = $key;
+            }
+            $path = implode('/', $parts);
+            return "$cdnUrl/$path";
+        }
         // Use custom endpoint if provided, otherwise default to AWS S3
-        if ($this->s3Endpoint !== null) {
+        elseif ($this->s3Endpoint !== null) {
             // For custom endpoints like DigitalOcean Spaces
             $endpoint = rtrim($this->s3Endpoint, '/');
             $key = preg_replace('/(\/+)/', '/', "$this->s3Bucket/$this->s3Prefix/$key");

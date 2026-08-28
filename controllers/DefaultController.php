@@ -198,6 +198,11 @@ class DefaultController extends Controller
             $parameters['s3Endpoint'] = $endpoint;
         }
 
+        $cdnUrl = $this->getCdnUrl();
+        if ($cdnUrl !== null) {
+            $parameters['s3CdnUrl'] = $cdnUrl;
+        }
+
         if ($delimiter !== null) {
             $parameters['delimiter'] = $delimiter;
         }
@@ -386,6 +391,32 @@ class DefaultController extends Controller
         $manager = \Yii::$app->getModule('s3manager');
         if (array_key_exists('endpoint', $manager->configuration)) {
             return $manager->configuration['endpoint'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Gets the CDN URL from session, params, or module configuration
+     * If provided, this URL will be used for file paths instead of the S3 endpoint
+     *
+     * @return     ?string                           The CDN URL or null if not configured
+     */
+    private function getCdnUrl(): ?string
+    {
+        /**
+         * Check parameters first
+         */
+        if (isset(\Yii::$app->params['s3cdnurl'])) {
+            return \Yii::$app->params['s3cdnurl'];
+        }
+
+        /**
+         * Check module configuration
+         */
+        $manager = \Yii::$app->getModule('s3manager');
+        if (array_key_exists('cdnUrl', $manager->configuration)) {
+            return $manager->configuration['cdnUrl'];
         }
 
         return null;
