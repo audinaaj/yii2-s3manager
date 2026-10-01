@@ -623,8 +623,8 @@ class S3Adapter extends \yii\base\BaseObject
             imagecopyresampled($thumb, $original, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
             imagejpeg($thumb, $thumbFile, 85);
             
-            imagedestroy($original);
-            imagedestroy($thumb);
+            //imagedestroy($original);
+            //imagedestroy($thumb);
             
             return "/thumbs/" . basename($thumbFile);
         } catch (\Exception $e) {
