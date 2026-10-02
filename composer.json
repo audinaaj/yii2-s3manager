@@ -29,8 +29,8 @@
         "tinymce/tinymce": "5.10.3",
         "2amigos/yii2-tinymce-widget": "~1.1",
         "thiagotalma/yii2-jstree": "~1.0.0",
-        "league/flysystem": "^2.0",
-        "league/flysystem-aws-s3-v3": "^2.0"
+        "league/flysystem": "^3.0",
+        "league/flysystem-aws-s3-v3": "^3.0"
     },
     "autoload": {
         "psr-4": {
