@@ -31,18 +31,24 @@ $(document).ready( function() {
     $('.modal').on('show.bs.modal', function(e) {
         opener = document.activeElement;
         
-        // Get the target input from the button's data attribute
+        // Determine if this was opened from TinyMCE or from a regular button
+        var fromTinyMCE = window.tinyMCECallback && typeof window.tinyMCECallback === 'function';
         var targetInputId = $(opener).data('target-input');
         var inputField = targetInputId ? $('#' + targetInputId) : null;
         var folderToLoad = '/';
         
-        // First, check if we have the folder stored as data attribute
-        if (inputField && inputField.data('s3-folder')) {
-            folderToLoad = inputField.data('s3-folder');
-        } 
-        // Otherwise, try to extract folder from the URL in the input field
-        else if (inputField && inputField.val()) {
-            folderToLoad = extractFolderFromUrl(inputField.val(), window.s3Bucket);
+        if (fromTinyMCE) {
+            // For TinyMCE, just load the root folder
+            folderToLoad = '/';
+        } else {
+            // First, check if we have the folder stored as data attribute
+            if (inputField && inputField.data('s3-folder')) {
+                folderToLoad = inputField.data('s3-folder');
+            } 
+            // Otherwise, try to extract folder from the URL in the input field
+            else if (inputField && inputField.val()) {
+                folderToLoad = extractFolderFromUrl(inputField.val(), window.s3Bucket);
+            }
         }
         
         // Load files and auto-select in tree
@@ -62,12 +68,36 @@ $(document).ready( function() {
      * Populate the input field with the selected file's effective URL and store the folder context
      */
     $('#insertFile').click(function(){
-        var targetInputId = $(opener).data('target-input');
+        var selectedUrl = $('#selectedFile').val();
         var currentFolder = $('#s3mm-upload-path').val();
         
-        $('#' + targetInputId).val($('#selectedFile').val());
-        $('#' + targetInputId).data('s3-folder', currentFolder);  // Store folder on input for next time
-        $('#' + targetInputId).trigger('change');
+        // Check if this is a TinyMCE callback or a regular input field
+        if (window.tinyMCECallback && typeof window.tinyMCECallback === 'function') {
+            // Call the TinyMCE callback with the selected file URL and meta
+            try {
+                window.tinyMCECallback(selectedUrl, window.tinyMCEMeta);
+                console.log('TinyMCE callback executed with URL:', selectedUrl);
+            } catch(e) {
+                console.error('Error calling TinyMCE callback:', e);
+                
+                // Fallback: Manually insert into TinyMCE editors
+                if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
+                    tinymce.activeEditor.insertContent('<img src="' + selectedUrl + '" />');
+                    console.log('Manually inserted image into TinyMCE');
+                }
+            }
+            // Clear stored references
+            window.tinyMCECallback = null;
+            window.tinyMCEValue = null;
+            window.tinyMCEMeta = null;
+        } else {
+            // Regular input field (not TinyMCE)
+            var targetInputId = $(opener).data('target-input');
+            $('#' + targetInputId).val(selectedUrl);
+            $('#' + targetInputId).data('s3-folder', currentFolder);  // Store folder on input for next time
+            $('#' + targetInputId).trigger('change');
+        }
+        
         $('#MediaManager').modal('hide');
     });
 });
@@ -387,6 +417,29 @@ $('#s3mm-object-list').on('click', '.s3mm-delete-object', function(e, data) {
       });
 });
 
+/**
+ * TinyMCE File Picker Callback
+ * Called when user clicks the image/file button in the TinyMCE editor
+ * @param {function} callback - Function to call with the selected file URL
+ * @param {string} value - Current value in the editor
+ * @param {object} meta - Metadata about the file picker (e.g., filetype, fieldname)
+ */
+function filemanagerTinyMCE(callback, value, meta) {
+    console.log('filemanagerTinyMCE called', {callback: typeof callback, value: value, meta: meta});
+    
+    // Store the callback, value, and meta for use when the file is selected
+    window.tinyMCECallback = callback;
+    window.tinyMCEValue = value;
+    window.tinyMCEMeta = meta || {};
+    
+    // Show the media manager modal
+    $('#MediaManager').modal('show');
+    console.log('Modal shown, waiting for file selection');
+    
+    // Enable/disable the insert button initially
+    $('#insertFile').prop('disabled', true);
+}
+
 function convertSize(filesize)
 {
   var size = filesize.split(' ');
@@ -441,9 +494,4 @@ function humanFileSize(bytes, si) {
         ++u;
     } while(Math.abs(bytes) >= thresh && u < units.length - 1);
     return bytes.toFixed(1)+' '+units[u];
-}
-
-function filemanagerTinyMCE(callback, value, meta)
-{
-    $('#MediaManager').modal('show');
 }
