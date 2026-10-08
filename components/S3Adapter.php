@@ -356,8 +356,10 @@ class S3Adapter extends \yii\base\BaseObject
             new \League\Flysystem\AwsS3V3\AwsS3V3Adapter(
                 $this->s3,
                 $this->s3Bucket,
-                $this->s3Prefix ?? ''
-            )
+                $this->s3Prefix ?? '',
+                null
+            ),
+            []
         );
     }
 

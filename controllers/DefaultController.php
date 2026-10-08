@@ -54,10 +54,12 @@ class DefaultController extends Controller
             return json_encode($s3->folderObject);
         }
 
+        $module = \Yii::$app->getModule('s3manager');
         return json_encode([
             'bucketObject' => $s3->bucketObject,
             'folderObject' => $s3->folderObject,
             's3Bucket' => $s3->s3Bucket,
+            'cdnUrl' => $module->configuration['cdnUrl'] ?? '',
         ]);
     }
 
