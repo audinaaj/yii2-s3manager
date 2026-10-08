@@ -19,11 +19,12 @@ $(document).ready( function() {
         
         // Store S3 config from backend for URL extraction
         window.s3Bucket = obj.s3Bucket || '';
+        window.cdnUrl = obj.cdnUrl || '';
 
         createJsTree(obj.folderObject);
 
         $('#mm__wrapper').unblock();
-    });  
+    });
 
     /** Modal Stuff */
     var opener;
@@ -53,10 +54,11 @@ $(document).ready( function() {
         
         // Load files and auto-select in tree
         loadFilesInFolder(folderToLoad);
-        
+
         if (folderToLoad !== '/' && folderToLoad !== '') {
             // Normalize the path for jstree node selection
             var normalizedPath = folderToLoad.replace(/^\/+|\/+$/g, '') || '/';
+
             setTimeout(function() {
                 $('#folderTree').jstree(true).deselect_all();
                 $('#folderTree').jstree(true).select_node(normalizedPath);
@@ -67,7 +69,7 @@ $(document).ready( function() {
     /**
      * Populate the input field with the selected file's effective URL and store the folder context
      */
-    $('#insertFile').click(function(){
+    $(document).on('click', '#insertFile', function(){
         var selectedUrl = $('#selectedFile').val();
         var currentFolder = $('#s3mm-upload-path').val();
         
@@ -76,14 +78,10 @@ $(document).ready( function() {
             // Call the TinyMCE callback with the selected file URL and meta
             try {
                 window.tinyMCECallback(selectedUrl, window.tinyMCEMeta);
-                console.log('TinyMCE callback executed with URL:', selectedUrl);
             } catch(e) {
-                console.error('Error calling TinyMCE callback:', e);
-                
                 // Fallback: Manually insert into TinyMCE editors
                 if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
                     tinymce.activeEditor.insertContent('<img src="' + selectedUrl + '" />');
-                    console.log('Manually inserted image into TinyMCE');
                 }
             }
             // Clear stored references
@@ -165,9 +163,9 @@ function loadFilesInFolder(folderPath) {
     
     $('#s3mm-upload-path').val(folderPath);
     $('#s3mm-object-path-display').html(folderPath);
-    $('#s3mm-file-url-display').html(null);
-    $('#s3mm-copy-file-uri').addClass('invisible');
     $('#files').html('');
+    
+    clearSelectedFile();
 
     if (bucketObject[normalizedPath]) {
         for (var file in bucketObject[normalizedPath]) {
@@ -184,6 +182,123 @@ function loadFilesInFolder(folderPath) {
             );
             $('#files').append(fileRow);
         }
+        
+        // Add event listeners
+        $('.fileRow').off('click').on('click', function(e) {
+            // Don't select if clicking on action icons
+            if ($(e.target).closest('a').length === 0) {
+                const filename = $(this).data('filename');
+                const currentPath = $('#s3mm-upload-path').val();
+                selectFile(filename, currentPath, $(this));
+            }
+        });
+        
+        $('.s3mm-object').off('click').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const filename = $(this).closest('tr').data('filename');
+            const fileKey = $(this).attr('id');
+            
+            // Use AJAX to download with error handling
+            $.ajax({
+                url: '/s3manager/default/download',
+                data: { key: fileKey },
+                xhrFields: {
+                    responseType: 'blob'
+                },
+                success: function(blob, status, xhr) {
+                    // Check if response is actually a blob (file) or JSON error
+                    const contentType = xhr.getResponseHeader('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        // Error response
+                        try {
+                            const error = JSON.parse(blob);
+                            Swal.fire({
+                                title: 'Download Error',
+                                text: error.message || 'An error occurred while downloading the file.',
+                                icon: 'error'
+                            });
+                        } catch(e) {
+                            Swal.fire({
+                                title: 'Download Error',
+                                text: 'An error occurred while downloading the file.',
+                                icon: 'error'
+                            });
+                        }
+                        return;
+                    }
+                    
+                    // Success: download the file
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                },
+                error: function(xhr, status, error) {
+                    let message = 'An error occurred while downloading the file.';
+                    
+                    if (xhr.status === 404) {
+                        message = 'The file you are trying to download has been deleted or moved.';
+                    } else if (xhr.status === 403) {
+                        message = 'You do not have permission to download this file.';
+                    }
+                    
+                    Swal.fire({
+                        title: 'Download Error',
+                        text: message,
+                        icon: 'error'
+                    });
+                }
+            });
+        });
+        
+        $('.s3mm-delete-object').off('click').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const fileKey = $(this).attr('id');
+            
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You won't be able to revert this!",
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, delete it!'
+            }).then((result) => {
+                if (result.value === true) {
+                    // Delete the file from S3
+                    $.get('/s3manager/default/delete?key=' + encodeURIComponent(fileKey), function(data) {
+                        // Refetch the entire bucket from backend to ensure fresh data
+                        $.get('/s3manager/default/get-bucket-object', function(data) {
+                            var obj = JSON.parse(data);
+                            $('#folderTree').jstree(true).settings.core.data = obj.folderObject;
+                            $('#folderTree').jstree(true).refresh();
+                            bucketObject = JSON.parse(obj.bucketObject);
+                            
+                            // Refresh the current folder view with fresh data
+                            const currentPath = $('#s3mm-upload-path').val();
+                            loadFilesInFolder(currentPath);
+                            
+                            Swal.fire(
+                                'Deleted!',
+                                'Your file has been deleted.',
+                                'success'
+                            );
+                        });
+                    });
+                }
+            });
+        });
+        
+        // Ensure table can receive focus for keyboard navigation
+        $('#s3mm-object-list').off('click').on('click', function() {
+            $(this).focus();
+        });
     }
 }
 
@@ -258,21 +373,83 @@ function createJsTree(data)
                             'Deleted!',
                             'Your file has been deleted.',
                             'success'
-                        );                        
+                        );
                     }
-                });   
+                });
             } else {
                 $.get('/s3manager/default/get-bucket-object', function(data) {
                     var obj = JSON.parse(data);
                     $('#folderTree').jstree(true).settings.core.data = obj.folderObject;
                     $('#folderTree').jstree(true).refresh();
                     bucketObject = JSON.parse(obj.bucketObject);
-                });                 
+                });
             }
-          });        
+          });
+    });
+    
+    // Ensure folder tree can receive focus for keyboard navigation
+    $('#folderTree').on('click', function() {
+        $(this).focus();
     });
 }
 
+var selectedFile = null;
+var selectedFilePath = null;
+
+function selectFile(filename, folderPath, $row) {
+    // Update UI
+    $('#s3mm-object-list tbody tr').removeClass('selected');
+    $row.addClass('selected');
+    
+    selectedFile = filename;
+    selectedFilePath = folderPath + (folderPath.endsWith('/') ? '' : '/') + filename;
+    
+    // Update selected file section
+    updateSelectedFileDisplay();
+}
+
+function clearSelectedFile() {
+    selectedFile = null;
+    selectedFilePath = null;
+    updateSelectedFileDisplay();
+}
+
+function updateSelectedFileDisplay() {
+    const $section = $('#selectedFileSection');
+    
+    if (!selectedFile) {
+        $section.html(`<div class="selected-file-content">
+                    <p style="margin: 0; font-size: 12px; color: #999;">No file selected</p>
+                </div>`);
+        $section.addClass('empty');
+        $('#selectedFile').val('');
+        $('#insertFile').prop('disabled', true);
+    } else {
+        // Use CDN URL if available, otherwise fall back to S3 bucket format
+        let fileUrl = selectedFilePath;
+        if (window.cdnUrl) {
+            fileUrl = window.cdnUrl + selectedFilePath;
+        } else if (window.s3Bucket) {
+            fileUrl = `s3://${window.s3Bucket}${selectedFilePath}`;
+        }
+        
+        $section.html(`<div class="selected-file-content">
+                    <div class="selected-file-name"><i class="fas fa-file"></i> ${selectedFile}</div>
+                    <div class="selected-file-url-wrapper">
+                        <a href="#" id="s3mm-copy-selected-url" class="s3mm-copy-url" data-toggle="tooltip" data-placement="top" title="Copy URL">
+                            <i class="fas fa-copy"></i>
+                        </a>
+                        <div class="selected-file-url" id="s3mm-selected-url-display" title="${fileUrl}">${fileUrl}</div>
+                    </div>
+                </div>`);
+        $section.removeClass('empty');
+        $('#selectedFile').val(fileUrl);
+        $('#insertFile').prop('disabled', false);
+        
+        // Re-initialize tooltips for the new button
+        $('[data-toggle="tooltip"]').tooltip();
+    }
+}
 
 function blocker()
 {
@@ -283,7 +460,7 @@ function blocker()
             <ul><li></li><li></li><li></li><li></li><li></li></ul>
         </div>`,
         css : { backgroundColor: 'none', border: 'none' }
-    });    
+    });
 }
 
 /**
@@ -333,30 +510,47 @@ $('#s3mm-object-list').on('click', '.fileRow', function() {
         $('#insertFile').prop('disabled', false);
         $('#selectedFile').val(data.effectiveUrl);
         $('#s3mm-file-url-display').html(data.effectiveUrl);
-        $('#s3mm-copy-file-uri').removeClass('invisible');
 
-        if ( $('#s3mm-copy-file-uri').hasClass('fa-thumbs-up') )
-        {
-            $('#s3mm-copy-file-uri').removeClass('fa-thumbs-up');
-            $('#s3mm-copy-file-uri').addClass('fa-copy');
-        }
         $('#mm__wrapper').unblock();
     });
 });
 
 /**
- * Copy a File URI
+ * Copy selected file URL (using modern Clipboard API)
  */
-$('#s3mm-copy-file-uri').click( function() {
-    var el = document.getElementById('s3mm-file-url-display');
-    var range = document.createRange();
-    range.selectNodeContents(el);
-    var sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-    document.execCommand('copy');
-    $('#s3mm-copy-file-uri').removeClass('fa-copy');
-    $('#s3mm-copy-file-uri').addClass('fa-thumbs-up');
+$(document).on('click', '#s3mm-copy-selected-url', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const urlText = $('#s3mm-selected-url-display').text();
+    const $btn = $(this);
+    const $icon = $btn.find('i');
+    const originalTitle = $btn.attr('title');
+    
+    // Use modern Clipboard API
+    navigator.clipboard.writeText(urlText).then(() => {
+        // Show feedback: change icon to checkmark
+        $icon.removeClass('fa-copy').addClass('fa-check text-success');
+        
+        // Hide and reset tooltip
+        $btn.tooltip('hide');
+        $btn.attr('title', 'Copied!');
+        
+        // Reset after 2 seconds
+        setTimeout(() => {
+            $icon.removeClass('fa-check text-success').addClass('fa-copy');
+            $btn.attr('title', originalTitle);
+        }, 2000);
+    }).catch(err => {
+        // Fallback for browsers that don't support Clipboard API
+        console.error('Clipboard API failed:', err);
+        Swal.fire({
+            title: 'Copy Failed',
+            text: 'Unable to copy URL. Please copy manually.',
+            icon: 'error',
+            timer: 2000
+        });
+    });
 });
 
 /**
@@ -382,42 +576,6 @@ $('#s3mm-object-list').on('click', '.s3mm-object', function(e, data) {
 });
 
 /**
- * delete an s3 object
- */
-$('#s3mm-object-list').on('click', '.s3mm-delete-object', function(e, data) {
-    Swal.fire({
-        title: 'Are you sure?',
-        text: "You won't be able to revert this!",
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Yes, delete it!'
-    }).then((result) => {
-        if (result.value === true) {
-            Swal.fire(
-                'Deleted!',
-                'Your file has been deleted.',
-                'success'
-            );
-
-            var key = $(this).attr('id');
-
-            $.get('/s3manager/default/delete?key='+key, function(data) {
-                $.get('/s3manager/default/get-bucket-object', function(data) {
-                    var obj = JSON.parse(data);
-                    $('#folderTree').jstree(true).settings.core.data = obj.folderObject;
-                    $('#folderTree').jstree(true).refresh();
-                    bucketObject = JSON.parse(obj.bucketObject);
-                });
-            });
-
-            var parenttr = $(this).closest('tr');
-            $(parenttr).remove();    
-        }
-      });
-});
-
-/**
  * TinyMCE File Picker Callback
  * Called when user clicks the image/file button in the TinyMCE editor
  * @param {function} callback - Function to call with the selected file URL
@@ -425,8 +583,6 @@ $('#s3mm-object-list').on('click', '.s3mm-delete-object', function(e, data) {
  * @param {object} meta - Metadata about the file picker (e.g., filetype, fieldname)
  */
 function filemanagerTinyMCE(callback, value, meta) {
-    console.log('filemanagerTinyMCE called', {callback: typeof callback, value: value, meta: meta});
-    
     // Store the callback, value, and meta for use when the file is selected
     window.tinyMCECallback = callback;
     window.tinyMCEValue = value;
@@ -434,7 +590,6 @@ function filemanagerTinyMCE(callback, value, meta) {
     
     // Show the media manager modal
     $('#MediaManager').modal('show');
-    console.log('Modal shown, waiting for file selection');
     
     // Enable/disable the insert button initially
     $('#insertFile').prop('disabled', true);
@@ -464,7 +619,7 @@ function buildFileRow(icon, filename, id, modified, size, isImage = false, image
         thumbHtml = `<img src="/s3manager/default/thumbnail?key=${encodeURIComponent(imageKey)}" alt="${filename}" style="max-height:100px; max-width:150px; object-fit:contain;" class="img-thumbnail" />&nbsp;`;
     }
     
-    var filerow = `<tr class="fileRow">
+    var filerow = `<tr class="fileRow" data-filename="${filename}">
         <td>
             <a href="#" id="${id}" class="s3mm-object" data-toggle="tooltip" data-placement="top" title="Download">
                 <i class="far fa-arrow-alt-circle-down text-info"></i></a>
@@ -472,7 +627,7 @@ function buildFileRow(icon, filename, id, modified, size, isImage = false, image
                 <i class="far fa-times-circle text-danger"></i>
             </a>
         </td> 
-        <td><i class="${icon}"></i> ${filename}<div>${thumbHtml}</div></td>
+        <td><i class="${icon}"></i> <span class="filename-text">${filename}</span><div>${thumbHtml}</div></td>
         <td>${modified}</td>
         <td class="text-right text-muted">${size}</td>
     </tr>`;

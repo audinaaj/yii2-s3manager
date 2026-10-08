@@ -45,3 +45,11 @@
     left: 50%;
     margin-left: -27px;
 }
+
+@media (min-width: 1200px) {
+  .modal-xl {
+    width: 90%; /* Adjust percentage or use a fixed value like 1140px */
+    max-width: 1200px; /* Optional: prevents it from getting too large on ultra-wide screens */
+    margin: 30px auto;
+  }
+}
