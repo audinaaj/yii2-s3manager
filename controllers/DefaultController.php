@@ -76,18 +76,44 @@ class DefaultController extends Controller
 
     /**
      * Retrieves a private s3 object and offers it up for download to the client
-     * @return [type] [description]
+     * @param string $key The key of the S3 object to download
+     * @return void
      */
     public function actionDownload($key)
     {
         $s3 = $this->instantiateS3Adapter();
 
-        $file = $s3->download($key);
-        $filename = explode("/", $key);
+        try {
+            $file = $s3->download($key);
+            $filename = explode("/", $key);
 
-        header("Content-Type: {$file['ContentType']}");
-        header('Content-Disposition: attachment; filename=' . end($filename));
-        echo $file['Body'];
+            header("Content-Type: {$file['ContentType']}");
+            header('Content-Disposition: attachment; filename=' . end($filename));
+            echo $file['Body'];
+        } catch (\Aws\S3\Exception\S3Exception $e) {
+            // File not found
+            if (strpos($e->getMessage(), 'NoSuchKey') !== false) {
+                \Yii::$app->response->statusCode = 404;
+                return json_encode([
+                    'error' => 'File not found',
+                    'message' => 'The file you are trying to download has been deleted or moved.'
+                ]);
+            }
+            // Other AWS errors (permission denied, etc.)
+            \Yii::$app->response->statusCode = 403;
+            return json_encode([
+                'error' => 'Access denied',
+                'message' => 'You do not have permission to download this file.'
+            ]);
+        } catch (\Exception $e) {
+            // Catch any other unexpected errors
+            \Yii::error('Download error for key ' . $key . ': ' . $e->getMessage());
+            \Yii::$app->response->statusCode = 500;
+            return json_encode([
+                'error' => 'Download error',
+                'message' => 'An error occurred while downloading the file.'
+            ]);
+        }
     }
 
     /**
