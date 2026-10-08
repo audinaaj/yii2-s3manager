@@ -174,6 +174,10 @@ class DefaultController extends Controller
             return;
         }
         
+        // Add cache headers to browser cache for 30 days
+        \Yii::$app->response->headers->set('Cache-Control', 'public, max-age=2592000'); // 30 days
+        \Yii::$app->response->headers->set('Pragma', 'cache');
+        
         \Yii::$app->response->redirect($thumbUrl);
     }
 
