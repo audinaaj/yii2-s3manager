@@ -6,12 +6,12 @@
                 <h4 class="modal-title">Media Manager</h4>
             </div>
             <div class="modal-body"> 
-                <?= $this->render('index', []) ?>      
+                <?= $this->render('index', []) ?>
             </div>
             <div class="modal-footer">
                 <input type="hidden" id="selectedFile">
-                <button type="button" class="btn btn-success" id="insertFile" disabled="true">
-                    <i class="fas fa-arrow-circle-right"></i> Insert File
+                <button type="button" class="btn btn-success" id="insertFile" disabled>
+                    <i class="fas fa-check"></i> Select
                 </button>
                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
             </div>
